@@ -76,5 +76,9 @@ DARROW          =>
   *
   */
 
+.* {
+  cout << "Hello World" << endl;
+}
+
 
 %%
