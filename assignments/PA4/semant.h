@@ -7,6 +7,7 @@
 #include "stringtab.h"
 #include "symtab.h"
 #include "list.h"
+#include <map>
 
 #define TRUE 1
 #define FALSE 0

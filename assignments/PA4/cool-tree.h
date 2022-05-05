@@ -36,6 +36,12 @@ public:
    tree_node *copy()		 { return copy_Class_(); }
    virtual Class_ copy_Class_() = 0;
 
+   // added for PA4
+   virtual Symbol get_name() = 0;
+   virtual Symbol get_parent() = 0;
+   virtual Features get_features() = 0;
+   // end added for PA4
+
 #ifdef Class__EXTRAS
    Class__EXTRAS
 #endif
@@ -49,6 +55,22 @@ class Feature_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Feature(); }
    virtual Feature copy_Feature() = 0;
+
+   // added for PA4
+   virtual Symbol get_name() = 0;
+   virtual bool is_method() = 0;
+
+   // // method
+   // virtual Formals get_formals() = 0;
+   // virtual Expression get_expr() = 0;
+   // virtual Symbol get_return_type() = 0;
+
+   // // attribute
+   // virtual Symbol get_type_decl() = 0;
+   // virtual Expression get_init() = 0;
+
+
+   // end added for PA4
 
 #ifdef Feature_EXTRAS
    Feature_EXTRAS
@@ -162,6 +184,12 @@ public:
    Class_ copy_Class_();
    void dump(ostream& stream, int n);
 
+   // added for PA4
+   Symbol get_name() { return name; }
+   Symbol get_parent() { return parent; }
+   Features get_features() { return features; }
+   // end added for PA4
+
 #ifdef Class__SHARED_EXTRAS
    Class__SHARED_EXTRAS
 #endif
@@ -188,6 +216,14 @@ public:
    Feature copy_Feature();
    void dump(ostream& stream, int n);
 
+   // added for PA4
+   bool is_method() { return true; }
+   Symbol get_name() { return name; }
+   Formals get_formals() { return formals; }
+   Symbol get_return_type() { return return_type; }
+   Expression get_expr() { return expr; }
+   // end added for PA4
+
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
 #endif
@@ -211,6 +247,13 @@ public:
    }
    Feature copy_Feature();
    void dump(ostream& stream, int n);
+
+   // added for PA4
+   bool is_method() { return false; }
+   Symbol get_name() { return name; }
+   Symbol get_type_decl() { return type_decl; }
+   Expression get_init() { return init; }
+   // end added for PA4
 
 #ifdef Feature_SHARED_EXTRAS
    Feature_SHARED_EXTRAS
