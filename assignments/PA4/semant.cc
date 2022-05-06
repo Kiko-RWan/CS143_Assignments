@@ -35,7 +35,7 @@ static ostream& semant_error()
 } 
 
 static ostream& semant_error(tree_node *t)
-{
+{   
     error_stream << curr_class->get_filename() << ":" << t->get_line_number() << ": ";
     return semant_error();
 }
@@ -119,12 +119,15 @@ static void initialize_constants(void)
     val         = idtable.add_string("_val");
 }
 
-static void add_class(Class_ c) {
+static void add_class(Class_ c, bool basic_flag) {
+    curr_class = c;
     Symbol name = c->get_name();
     Symbol parent = c->get_parent();
-
     if(name == SELF_TYPE) {
         semant_error(c) << "Redefinition of basic class SELF_TYPE." << endl;
+    }
+    else if ((basic_flag == false) && (name == Int || name == Str || name == Bool || name == Object)) {
+        semant_error(c) << "Redefinition of basic class " << name << ".\n";
     }
     else if(name_class_map.count(name)) {
         semant_error(c) << "Class " << name << " was previously defined." << endl;
@@ -134,8 +137,8 @@ static void add_class(Class_ c) {
     }
     else {
         name_class_map[name] = c;
-        parent_map[name] = parent;         
-    }
+        parent_map[name] = parent;      
+    }   
 }
 
 static void install_basic_classes() {
@@ -238,11 +241,11 @@ static void install_basic_classes() {
 						      no_expr()))),
 	       filename);
 
-    add_class(Object_class);
-    add_class(IO_class);
-    add_class(Int_class);
-    add_class(Bool_class);
-    add_class(Str_class);
+    add_class(Object_class, true);
+    add_class(IO_class, true);
+    add_class(Int_class, true);
+    add_class(Bool_class, true);
+    add_class(Str_class, true);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -250,12 +253,12 @@ static void install_basic_classes() {
 // semant_error is an overloaded function for reporting errors
 // during semantic analysis.  There are three versions:
 //
-//    ostream& ClassTable::semant_error()                
+//    ostream& name_class_map::semant_error()                
 //
-//    ostream& ClassTable::semant_error(Class_ c)
+//    ostream& name_class_map::semant_error(Class_ c)
 //       print line number and filename for `c'
 //
-//    ostream& ClassTable::semant_error(Symbol filename, tree_node *t)  
+//    ostream& name_class_map::semant_error(Symbol filename, tree_node *t)  
 //       print a line number and filename
 //
 ///////////////////////////////////////////////////////////////////
@@ -275,7 +278,7 @@ static void check_inheritance() {
             }
             // 不存在父节点
             if (!parent_map.count(parent)){
-                semant_error(name_class_map[child]) << "Doesn't contain parent!" << endl;
+                semant_error(name_class_map[child]) << "Class " << child << " inherits from an undefined class " << parent << "." << endl;
                 return;
             }
             parent = parent_map[parent];
@@ -305,7 +308,7 @@ static void check_main() {
     }
 
     if (!main_class_flag){
-        semant_error() << "No main class!" << endl;
+        semant_error() << "Class Main is not defined." << endl;
     }
     else if(!main_method_flag){
         semant_error() << "No 'main' method in class Main." << endl;
@@ -388,7 +391,6 @@ static bool conform(Symbol type1, Symbol type2) {
         semant_error() << "Class " << type2 << " doesn't exist." << endl;
 
     std::vector<Class_> inheritance_list1;
-
     get_inheritance_list(type1, inheritance_list1);
     for (auto & it : inheritance_list1) {
         if (it->get_name() == type2)
@@ -476,26 +478,30 @@ static void check_methods() {
 void method_class::check_type() {
     object_env.enterscope();
     // 检查参数
+    std::set<Symbol> param_types;
     for (int i = formals->first(); formals->more(i); i = formals->next(i)) {
         Formal formal = formals->nth(i);
-        if (formal->get_name() == self) {
+        if (param_types.count(formal->get_name())) {
+            semant_error(formal) << "Formal parameter " << formal->get_name() << " is multiply defined.\n";
+        }
+        else if (formal->get_name() == self) {
             semant_error(formal) << "self cannot be used as formal parameter" << endl;
         }
-        else if (object_env.lookup(formal->get_name()) != NULL)
-            semant_error(formal) << "duplicate formal parameter " << formal->get_name() << endl;
         else if (name_class_map.count(formal->get_type_decl()) == 0)
             semant_error(formal) << "Class " << formal->get_type_decl() << " of formal parameter " << formal->get_name() << " is undefined." << endl;
-        else
+        else {
             object_env.addid(formal->get_name(), new Symbol(formal->get_type_decl()));
+            param_types.insert(formal->get_name());
+        }
     }
     // 检查返回值
     Symbol expr_type = expr->check_type();
     if (return_type != SELF_TYPE && name_class_map.count(return_type) == 0)
-        semant_error(this) << "Undefined return type " << return_type << " in method " << name << endl;
+        semant_error(this) << "Undefined return type " << return_type << " in method " << name << ".\n";
     else if (!conform(expr_type, return_type)) {
         semant_error(this) << "Inferred return type " << expr_type 
             << " of method " << name 
-            << " does not conform to declared return type " << return_type << endl;
+            << " does not conform to declared return type " << return_type << "." << endl;
     }
     object_env.exitscope();
 }
@@ -503,7 +509,9 @@ void method_class::check_type() {
 // 属性的typecheck
 void attr_class::check_type() {
     Symbol expr_type = init->check_type();
-    if (name == self) {
+    if (object_env.lookup(name) != NULL && *object_env.lookup(name) != type_decl)
+        semant_error(this) << "Attribute " << name << " is an attribute of an inherited class." << endl;
+    else if (name == self) {
         semant_error(this) << "'self' cannot be the name of an attribute." << endl;
         exit_with_error();
     }
@@ -512,11 +520,11 @@ void attr_class::check_type() {
             << "Class " << type_decl
             << " of attribute " << name << " is undefined." << endl;
     }
-    else if (name_class_map.count(type_decl) != 0 && !conform(expr_type, type_decl)) {
+    else if (name_class_map.find(expr_type) != name_class_map.end() && !conform(expr_type, type_decl)) {
         semant_error(this) 
             << "Inferred type " << expr_type 
             << " of initialization of attribute " << name
-            << " does not conform to declared type " << type_decl << endl;
+            << " does not conform to declared type." << type_decl << endl;
     }
 }
 
@@ -533,11 +541,13 @@ Symbol assign_class::check_type() {
 
     Symbol var_type = *object_env.lookup(name);
     if (!conform(expr_type, var_type)) {
-        semant_error(this) << "Type " << expr_type << " of assignment does not conform to declared type " << var_type << endl;
+        semant_error(this) 
+            << "Type " << expr_type 
+            << " of assigned expression does not conform to declared type " << var_type 
+            << " of identifier " << name << "." << endl;
         type = var_type;
         return type;
     }
-
     type = expr_type;
     return type;
 }   
@@ -559,7 +569,7 @@ Symbol static_dispatch_class::check_type() {
 
     if (!conform(expr_type, type_name)) {
         error = true;
-        semant_error(this) << "Expression type " << expr_type << " does not conform to declared static dispatch type " << type_name << endl;
+        semant_error(this) << "Expression type " << expr_type << " does not conform to declared static dispatch type " << type_name << "." << endl;
     }
 
     // 找实际使用的方法
@@ -708,7 +718,7 @@ Symbol cond_class::check_type() {
 
 Symbol loop_class::check_type() {
     if (pred->check_type() != Bool)
-        semant_error(this) << "Predicate of loop must be boolean.\n";
+        semant_error(this) << "Loop condition does not have type Bool.\n";
     body->check_type();
     type = Object;
     return type;
@@ -722,7 +732,7 @@ Symbol typcase_class::check_type() {
     for (int i = cases->first(); cases->more(i); i = cases->next(i)) {
         branch_class* branch = static_cast<branch_class*>(cases->nth(i));
         if (branch_type_decls.count(branch->get_type_decl()) > 0)
-            semant_error(this) << "Duplicate branch type declaration " << branch->get_type_decl() << ".\n";
+            semant_error(this) << "Duplicate branch " << branch->get_type_decl() << " in case statement.\n";
         else 
             branch_type_decls.insert(branch->get_type_decl());
 
@@ -757,10 +767,12 @@ Symbol let_class::check_type() {
     object_env.addid(identifier, new Symbol(type_decl));
 
     Symbol init_type = init->check_type();
-    if (name_class_map.count(init_type) == 0) 
+    if (identifier == self) 
+        semant_error(this) << "'self' cannot be bound in a 'let' expression.\n";
+    else if (init_type != No_type && init_type != SELF_TYPE && name_class_map.count(init_type) == 0) 
         semant_error(this) << "Let binding " << identifier << " has type " << init_type << ", which is not a defined type.\n";
     else if (init_type != No_type && !conform(init_type, type_decl))
-        semant_error(this) << "Let binding " << identifier << " has type " << init_type << ", which does not conform to declared type " << type_decl << ".\n";
+        semant_error(this) << "Inferred type " << init_type << " of initialization of " << identifier << " does not conform to identifier's declared type " << type_decl << ".\n";
 
     type = body->check_type();
     object_env.exitscope();
@@ -823,7 +835,7 @@ Symbol lt_class::check_type() {
 Symbol eq_class::check_type() {
     Symbol t1 = e1->check_type(), t2 = e2->check_type();
     if ((t1 == Int || t1 == Bool || t1 == Str || t2 == Int || t2 == Bool || t2 == Str) && t1 != t2)
-        semant_error(this) << "Illegal comparison with a basic type.\n";
+        semant_error(this) << "Illegal comparison with a basic type." << endl;
     type = Bool;
     return type;
 }
@@ -911,9 +923,8 @@ void program_class::semant()
 
     install_basic_classes();
     for (int i = classes->first(); classes->more(i); i = classes->next(i)) {
-        add_class(classes->nth(i));
+        add_class(classes->nth(i), false);
     }
-
     /* some semantic analysis code may go here */
     check_inheritance();
     exit_with_error();
