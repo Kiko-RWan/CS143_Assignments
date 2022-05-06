@@ -100,6 +100,7 @@ void dump_type(ostream&, int);               \
 Expression_class() { type = (Symbol) NULL; }
 
 #define Expression_SHARED_EXTRAS           \
-void dump_with_types(ostream&,int); 
+void dump_with_types(ostream&,int); \
+Symbol check_type();
 
 #endif

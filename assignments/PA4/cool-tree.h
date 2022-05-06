@@ -86,6 +86,11 @@ public:
    tree_node *copy()		 { return copy_Formal(); }
    virtual Formal copy_Formal() = 0;
 
+   // added for PA4
+   virtual Symbol get_name() = 0;
+   virtual Symbol get_type_decl() = 0;
+   // end added for PA4
+
 #ifdef Formal_EXTRAS
    Formal_EXTRAS
 #endif
@@ -99,6 +104,7 @@ class Expression_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Expression(); }
    virtual Expression copy_Expression() = 0;
+   virtual Symbol check_type() = 0;
 
 #ifdef Expression_EXTRAS
    Expression_EXTRAS
@@ -113,6 +119,9 @@ class Case_class : public tree_node {
 public:
    tree_node *copy()		 { return copy_Case(); }
    virtual Case copy_Case() = 0;
+
+   Symbol type;
+
 
 #ifdef Case_EXTRAS
    Case_EXTRAS
@@ -222,6 +231,7 @@ public:
    Formals get_formals() { return formals; }
    Symbol get_return_type() { return return_type; }
    Expression get_expr() { return expr; }
+   void check_type();
    // end added for PA4
 
 #ifdef Feature_SHARED_EXTRAS
@@ -253,6 +263,7 @@ public:
    Symbol get_name() { return name; }
    Symbol get_type_decl() { return type_decl; }
    Expression get_init() { return init; }
+   void check_type();
    // end added for PA4
 
 #ifdef Feature_SHARED_EXTRAS
@@ -277,6 +288,11 @@ public:
    Formal copy_Formal();
    void dump(ostream& stream, int n);
 
+   // added for PA4
+   Symbol get_name() { return name; }
+   Symbol get_type_decl() { return type_decl; }
+   // end added for PA4
+
 #ifdef Formal_SHARED_EXTRAS
    Formal_SHARED_EXTRAS
 #endif
@@ -300,6 +316,13 @@ public:
    }
    Case copy_Case();
    void dump(ostream& stream, int n);
+
+   // added for PA4
+   Symbol get_name() { return name; }
+   Symbol get_type_decl() { return type_decl; }
+   Expression get_expr() { return expr; }
+   Symbol check_type();
+   // end added for PA4
 
 #ifdef Case_SHARED_EXTRAS
    Case_SHARED_EXTRAS
