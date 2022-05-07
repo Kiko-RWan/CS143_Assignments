@@ -458,7 +458,7 @@ static void check_methods() {
                         k2 = ancestor_formals->next(k2);
                         if (curr_formals->more(k1) xor ancestor_formals->more(k2))
                             semant_error(curr_method) 
-                                << "Incompatible number of formal parameters in redefined method " << curr_method->get_name() << endl;
+                                << "Incompatible number of formal parameters in redefined method " << curr_method->get_name() << ".\n";
                     }
                 }
             }
@@ -485,8 +485,10 @@ void method_class::check_type() {
             semant_error(formal) << "Formal parameter " << formal->get_name() << " is multiply defined.\n";
         }
         else if (formal->get_name() == self) {
-            semant_error(formal) << "self cannot be used as formal parameter" << endl;
+            semant_error(formal) << "'self' cannot be the name of a formal parameter." << endl;
         }
+        else if (formal->get_type_decl() == SELF_TYPE) 
+            semant_error(formal) << "Formal parameter " << formal->get_name() << " cannot have type SELF_TYPE." << endl;
         else if (name_class_map.count(formal->get_type_decl()) == 0)
             semant_error(formal) << "Class " << formal->get_type_decl() << " of formal parameter " << formal->get_name() << " is undefined." << endl;
         else {
@@ -494,11 +496,12 @@ void method_class::check_type() {
             param_types.insert(formal->get_name());
         }
     }
+    exit_with_error();
     // 检查返回值
-    Symbol expr_type = expr->check_type();
     if (return_type != SELF_TYPE && name_class_map.count(return_type) == 0)
         semant_error(this) << "Undefined return type " << return_type << " in method " << name << ".\n";
-    else if (!conform(expr_type, return_type)) {
+    Symbol expr_type = expr->check_type();
+    if (!conform(expr_type, return_type)) {
         semant_error(this) << "Inferred return type " << expr_type 
             << " of method " << name 
             << " does not conform to declared return type " << return_type << "." << endl;
@@ -533,7 +536,12 @@ void attr_class::check_type() {
 Symbol assign_class::check_type() {
     Symbol expr_type = expr->check_type();
 
-    if (object_env.lookup(name) == NULL) {
+    if (name == self) {
+        semant_error(this) << "Cannot assign to 'self'." << endl;
+        type = expr_type;
+        return type;
+    }
+    else if (object_env.lookup(name) == NULL) {
         semant_error(this) << "Assignment to undefined variable " << name << endl;
         type = expr_type;
         return type;
@@ -567,7 +575,7 @@ Symbol static_dispatch_class::check_type() {
         return type;
     }
 
-    if (!conform(expr_type, type_name)) {
+    if (!conform(expr_type, this->type_name)) {
         error = true;
         semant_error(this) << "Expression type " << expr_type << " does not conform to declared static dispatch type " << type_name << "." << endl;
     }
@@ -876,6 +884,7 @@ Symbol new__class::check_type() {
     if (this->type_name != SELF_TYPE && name_class_map.count(this->type_name) == 0) {
         semant_error(this) << "'new' used with undefined class " << this->type_name << ".\n";
         this->type_name = Object;
+        exit_with_error();
     }
     type = this->type_name;
     return type;
